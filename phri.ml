@@ -16,8 +16,31 @@
 (*===========================================================================*)
 
 (*===========================================================================*)
+
+let print_typed_var fmt tm =
+      let s,ty = dest_var tm in
+      pp_print_string fmt ("("^s^":"^string_of_type ty^")") in
+    install_user_printer("print_typed_var",print_typed_var);;
+
+
+(*----For deleting type-----------*)
+
+delete_user_printer "print_typed_var";;
+
+(*===========================================================================*)
+
+(*===========================================================================*)
 (*            Formalization of Physical Human Robot Interaction              *)
 (*===========================================================================*)
+
+(*
+We need to load real analysis theory of HOL Light by 
+needs "Multivariate/realanalysis.ml"
+
+and the Laplace transform theory available at Github
+
+*)
+
 
 (*---------------------------------------------------------------------------*)
 (*---------------------------------------------------------------------------*)
@@ -31,18 +54,17 @@ new_type_abbrev
      ("phy_inter_par",`:m # c # k`);;  (*==Physical Interaction Parameters==*)
 
 
-new_type_abbrev ("force_fun",`:real^1->complex`);;  (*=Type of Force Function, which can be used for defining the Interaction Force further=*)
+new_type_abbrev ("force_fun",`:real^1->complex`);;  (*=Type of Force Function=*)
 
 
-new_type_abbrev ("dist_fun",`:real^1->complex`);;  (*=Distance function, which can further be used to define displacement, velocity and acceleration=*)
+new_type_abbrev ("dist_fun",`:real^1->complex`);;  (*=Distance function=*)
 
-new_type_abbrev ("vel_fun",`:real^1->complex`);;  (*=Velocity function, which can further be used to define acceleration and other higher derivatives =*)
+new_type_abbrev ("vel_fun",`:real^1->complex`);;  (*=Velocity function=*)
 
 
 (* ------------------------------------------------------------------------- *)
 (*                 Modeling one-dimensional Admittance Equation              *)
 (* ------------------------------------------------------------------------- *)
-
 
 let lst_x_fun = new_definition `  
     lst_x_fun ((m,c,k):phy_inter_par) = [Cx k; Cx c; Cx m]`;;
@@ -105,6 +127,7 @@ let ADMIT_EQ_1D_EQUIV_THM = top_thm ();;
 (* ------------------------------------------------------------------------- *)
 (*      Modeling one-dimensional Admittance Equation under free motion       *)
 (* ------------------------------------------------------------------------- *)
+
 
 (*==Under the conditions when x_0, x_0^dot, x_0^dotdot and k is zero==*)
 
@@ -185,7 +208,6 @@ let lap_tran_admit_eq_1d = new_definition
           (laplace_transform fH s  = laplace_transform (\t. diff_eq_n_order 2 (lst_x_fun (m,c,k)) x t) s)`;; 
 
 
-(*==Thoerem titled "LAPLACE_OF_DIFF_EQ_ZERO_INIT_SECOND" is already available in the Laplace transform library==*)
 
 g `!(x:dist_fun) m c k s.
   laplace_exists_higher_deriv 2 x s /\
@@ -224,7 +246,6 @@ e (POP_ASSUM MP_TAC THEN REWRITE_TAC [ARITH_RULE `2 - 1 = 1`; ARITH_RULE `0 < 2`
 let LAPLACE_OF_RHS_ADMIT_EQ_GEN = top_thm ();;
 
 (* ------------------------------------------------------------------------- *)
-
 
 
 (**-----transfer function = Xd / FH = 1 / s (ms + c)-----**)
@@ -295,6 +316,14 @@ let TF_ADMIT_EQ_FM_1D = top_thm ();;
 (* ------------------------------------------------------------------------- *)
 (* ------------------------------------------------------------------------- *)
 
+(*
+
+Tc: A time constant related to parameters modeling bias and imperfections
+
+V (s) / f_H (s) = (1 / c) / (((m / c) * s + 1) * (Tc * s + 1))
+
+*)
+
 let lst_Vs_fun_olm = new_definition `  
     lst_Vs_fun_olm ((m,c,k):phy_inter_par) Tc =
               [Cx (&1); (Cx m / Cx c) + Cx Tc; (Cx m / Cx c) * Cx Tc]`;;
@@ -359,6 +388,8 @@ let TF_ADMIT_EQ_1D_OLM = top_thm ();;
 (* ------------------------------------------------------------------------- *)
 (* ------------------------------------------------------------------------- *)
 
+(*---  The closed-loop model verification  ---*)
+
 
 let lst_Vs_fun_clm = new_definition `  
     lst_Vs_fun_clm ((m,c,k):phy_inter_par) Tc KH =
@@ -422,93 +453,41 @@ let TF_ADMIT_EQ_1D_CLM = top_thm ();;
 (* ------------------------------------------------------------------------- *)
 (* ------------------------------------------------------------------------- *)
 
-(*---  The improved open-loop model verification    ---*)
-
-let lst_Vs_fun_iolm_1 = new_definition `  
-    lst_Vs_fun_iolm_1 ((m,c,k):phy_inter_par) a0 a1 a2 a3 a4 =
-              [Cx c * a0;
-	             Cx m * a0 + Cx c * a1; 			  
-			       Cx m * a1 + Cx c * a2; 
-			         Cx m * a2 + Cx c * a3; 
-			           Cx m * a3 + Cx c * a4; 
-						 Cx m * a4]`;;
-
-let lst_fH_fun_iolm_1 = new_definition `  
-    lst_fH_fun_iolm_1 KB CB Kp = [Cx Kp * Cx KB; Cx Kp * Cx CB]`;;
+(*---  The improved open-loop model verification  ---*)
 
 
-let admit_eq_1d_iolm_1 = new_definition
-    `admit_eq_1d_iolm_1 (fH:force_fun) (Vs:dist_fun) ((m,c,k):phy_inter_par) KB CB Kp a0 a1 a2 a3 a4 t = 
-          (diff_eq_n_order 5 (lst_Vs_fun_iolm_1 (m,c,k) a0 a1 a2 a3 a4) Vs t =
-                  diff_eq_n_order 1 (lst_fH_fun_iolm_1 KB CB Kp) fH t)`;; 
+let lst_Vs_fun_iolm = new_definition `  
+    lst_Vs_fun_iolm ((m,c,k):phy_inter_par) Kp KB CB CR MR mR Tc =
+        [Cx c * (Cx Kp * Cx KB + Cx KB * Cx CR);
+	  Cx m * (Cx Kp * Cx KB + Cx KB * Cx CR) + Cx c * (Cx CB * Cx CR + Cx KB * Cx MR + Cx KB * Cx CR * Cx Tc + Cx Kp * Cx CR + Cx mR * Cx KB + Cx KB * Cx CR); 			  
+			       Cx m * (Cx CB * Cx CR + Cx KB * Cx MR + Cx KB * Cx CR * Cx Tc + Cx Kp * Cx CR + Cx mR * Cx KB + Cx KB * Cx CR) + Cx c * (Cx Kp * Cx MR + Cx mR * Cx CB + Cx mR * Cx KB * Cx Tc + Cx mR * Cx CR + Cx CB * Cx MR + Cx CB * Cx CR * Cx Tc + Cx KB * Cx MR * Cx Tc); 
+			         Cx m * (Cx Kp * Cx MR + Cx mR * Cx CB + Cx mR * Cx KB * Cx Tc + Cx mR * Cx CR + Cx CB * Cx MR + Cx CB * Cx CR * Cx Tc + Cx KB * Cx MR * Cx Tc) + Cx c * (Cx mR * Cx MR + Cx mR * Cx CR * Cx Tc + Cx mR * Cx CB * Cx Tc + Cx CB * Cx MR * Cx Tc); 
+			           Cx m * (Cx mR * Cx MR + Cx mR * Cx CR * Cx Tc + Cx mR * Cx CB * Cx Tc + Cx CB * Cx MR * Cx Tc) + Cx c * (Cx mR * Cx MR * Cx Tc); 
+						 Cx m * (Cx mR * Cx MR * Cx Tc)]`;;
+
+let lst_fH_fun_iolm = new_definition `  
+    lst_fH_fun_iolm KB CB Kp = [Cx Kp * Cx KB; Cx Kp * Cx CB]`;;
 
 
-let tf_admit_eq_iolm_1 = new_definition 
-   `tf_admit_eq_iolm_1 (fH:force_fun) (Vs:vel_fun) ((m,c,k):phy_inter_par) KB CB Kp a0 a1 a2 a3 a4 s
+let admit_eq_1d_iolm = new_definition
+    `admit_eq_1d_iolm (fH:force_fun) (Vs:dist_fun) ((m,c,k):phy_inter_par) Kp KB CB CR MR mR Tc t = 
+          (diff_eq_n_order 5 (lst_Vs_fun_iolm (m,c,k) Kp KB CB CR MR mR Tc) Vs t =
+                  diff_eq_n_order 1 (lst_fH_fun_iolm KB CB Kp) fH t)`;; 
+
+
+let tf_admit_eq_iolm = new_definition 
+   `tf_admit_eq_iolm (fH:force_fun) (Vs:vel_fun) ((m,c,k):phy_inter_par) Kp KB CB CR MR mR Tc s
     = ( transfer_function s fH Vs = 
     ((Cx Kp * Cx CB * s + Cx Kp * Cx KB) / 
-	 ((Cx m * a4) * s pow 5 + (Cx m * a3 + Cx c * a4) * s pow 4 + 
-	       (Cx m * a2 + Cx c * a3) * s pow 3 + (Cx m * a1 + Cx c * a2) * s pow 2 + 
-		                      (Cx m * a0 + Cx c * a1) * s + Cx c * a0)) )`;;
+	 ((Cx m * (Cx mR * Cx MR * Cx Tc)) * s pow 5 + (Cx m * (Cx mR * Cx MR + Cx mR * Cx CR * Cx Tc + Cx mR * Cx CB * Cx Tc + Cx CB * Cx MR * Cx Tc) + Cx c * (Cx mR * Cx MR * Cx Tc)) * s pow 4 + 
+	       (Cx m * (Cx Kp * Cx MR + Cx mR * Cx CB + Cx mR * Cx KB * Cx Tc + Cx mR * Cx CR + Cx CB * Cx MR + Cx CB * Cx CR * Cx Tc + Cx KB * Cx MR * Cx Tc) + Cx c * (Cx mR * Cx MR + Cx mR * Cx CR * Cx Tc + Cx mR * Cx CB * Cx Tc + Cx CB * Cx MR * Cx Tc)) * s pow 3 + (Cx m * (Cx CB * Cx CR + Cx KB * Cx MR + Cx KB * Cx CR * Cx Tc + Cx Kp * Cx CR + Cx mR * Cx KB + Cx KB * Cx CR) + Cx c * (Cx Kp * Cx MR + Cx mR * Cx CB + Cx mR * Cx KB * Cx Tc + Cx mR * Cx CR + Cx CB * Cx MR + Cx CB * Cx CR * Cx Tc + Cx KB * Cx MR * Cx Tc)) * s pow 2 + 
+		                      (Cx m * (Cx Kp * Cx KB + Cx KB * Cx CR) + Cx c * (Cx CB * Cx CR + Cx KB * Cx MR + Cx KB * Cx CR * Cx Tc + Cx Kp * Cx CR + Cx mR * Cx KB + Cx KB * Cx CR)) * s + Cx c * (Cx Kp * Cx KB + Cx KB * Cx CR))) )`;;
 
 
-g `!k c m (fH:force_fun) (Vs:vel_fun) Tc KB CB Kp a0 a1 a2 a3 a4 s.
-   valid_phycl_intractn_parmtrs_fm ((m,c,k):phy_inter_par) /\
-   (!t. differentiable_higher_derivative 5 Vs t) /\  
-   (!t. differentiable_higher_derivative 1 fH t) /\
-   (laplace_exists_higher_deriv 5 Vs s) /\ 
-   (laplace_exists_higher_deriv 1 fH s) /\
-    zero_initial_conditions 4 Vs /\
-    zero_initial_conditions 0 fH /\
-  ~(laplace_transform fH s = Cx (&0)) /\
-  ~(((Cx m * a4) * s pow 5 + (Cx m * a3 + Cx c * a4) * s pow 4 + 
-	       (Cx m * a2 + Cx c * a3) * s pow 3 + (Cx m * a1 + Cx c * a2) * s pow 2 + 
-		                      (Cx m * a0 + Cx c * a1) * s + Cx c * a0) = Cx (&0)) /\
-   (!t. admit_eq_1d_iolm_1 fH Vs (m,c,k) KB CB Kp a0 a1 a2 a3 a4 t)
-    ==> 
-     tf_admit_eq_iolm_1 fH Vs (m,c,k) KB CB Kp a0 a1 a2 a3 a4 s`;;
+(*===============-----------------========================*)
 
 
-e (REWRITE_TAC [valid_phycl_intractn_parmtrs_fm; admit_eq_1d_iolm_1; tf_admit_eq_iolm_1; transfer_function]);;
-e (REPEAT STRIP_TAC THEN
-  ASM_SIMP_TAC
-    [COMPLEX_FIELD
-       `! a b c d. ~(d = Cx (&0)) /\  ~(b = Cx (&0)) ==> ( (a / b = c / d ) = (a * d = b * c ))`]);;
-e (SUBGOAL_THEN
-    `((Cx m * a4) * s pow 5 + (Cx m * a3 + Cx c * a4) * s pow 4 + 
-	       (Cx m * a2 + Cx c * a3) * s pow 3 + (Cx m * a1 + Cx c * a2) * s pow 2 + 
-		                      (Cx m * a0 + Cx c * a1) * s + Cx c * a0) = 
-      vsum (0..5) (\i. (EL i (lst_Vs_fun_iolm_1 (m,c,k) a0 a1 a2 a3 a4)) * s pow i)`
-    ASSUME_TAC);;
-      e (TF_SUM_SIMP lst_Vs_fun_iolm_1);;
-      e (SIMP_TAC [CX_ADD; CX_SUB; CX_MUL; CX_DIV] THEN TF_POW_SIMP complex_pow THEN CONV_TAC COMPLEX_FIELD);;
-
-e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
-
-e (SUBGOAL_THEN `laplace_transform fH s * (Cx Kp * Cx CB * s + Cx Kp * Cx KB) = laplace_transform fH s * vsum (0..1) (\i. EL i (lst_fH_fun_iolm_1 KB CB Kp) * s pow i)` ASSUME_TAC);;
-      e (AP_TERM_TAC);;
-      e (TF_SUM_SIMP lst_fH_fun_iolm_1);;
-      e (TF_POW_SIMP complex_pow THEN CONV_TAC COMPLEX_FIELD);;
-
-e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
-e (MATCH_MP_TAC TRANSFER_FUNCTION_OF_N_ORDER_SYS_ALT_SECOND);;
-e (TF_ARITH_TAC THEN ASM_SIMP_TAC [diff_eq_n_order_sys]);;
-
-let TF_ADMIT_EQ_1D_IOLM = top_thm ();;
-
-(*===========---------------------------------------==============*)
-
-
-(*---  The improved open-loop model verification Final theorem ---*)
-
-
-(*=========================================================================*)
-(*=========================================================================*)
-
-
-
-
-g `!k c m (fH:force_fun) (Vs:vel_fun) Tc KB CB Kp a0 a1 a2 a3 a4 s.
+g `!k c m (fH:force_fun) (Vs:vel_fun) Kp KB CB CR MR mR Tc s.
    valid_phycl_intractn_parmtrs_fm ((m,c,k):phy_inter_par) /\
    (!t. differentiable_higher_derivative 5 Vs t) /\  
    (!t. differentiable_higher_derivative 1 fH t) /\
@@ -526,124 +505,66 @@ g `!k c m (fH:force_fun) (Vs:vel_fun) Tc KB CB Kp a0 a1 a2 a3 a4 s.
 		                      (Cx m * (Cx Kp * Cx KB + Cx KB * Cx CR) + 
 							  Cx c * (Cx CB * Cx CR + Cx KB * Cx MR + Cx KB * Cx CR * Cx Tc + Cx Kp * Cx CR + Cx mR * Cx KB + Cx KB * Cx CR)) * s + 
 							  Cx c * (Cx Kp * Cx KB + Cx KB * Cx CR)) = Cx (&0)) /\
-   (!t. admit_eq_1d_iolm_1 fH Vs (m,c,k) KB CB Kp 
-   (Cx Kp * Cx KB + Cx KB * Cx CR)
-     (Cx CB * Cx CR + Cx KB * Cx MR + Cx KB * Cx CR * Cx Tc + Cx Kp * Cx CR + Cx mR * Cx KB + Cx KB * Cx CR)   
-      (Cx Kp * Cx MR + Cx mR * Cx CB + Cx mR * Cx KB * Cx Tc + Cx mR * Cx CR + Cx CB * Cx MR + Cx CB * Cx CR * Cx Tc + Cx KB * Cx MR * Cx Tc) 
-          (Cx mR * Cx MR + Cx mR * Cx CR * Cx Tc + Cx mR * Cx CB * Cx Tc + Cx CB * Cx MR * Cx Tc) (Cx mR * Cx MR * Cx Tc) t)
+   (!t. admit_eq_1d_iolm fH Vs (m,c,k) Kp KB CB CR MR mR Tc t)
     ==> 
-     tf_admit_eq_iolm_1 fH Vs (m,c,k) KB CB Kp 
-	 (Cx Kp * Cx KB + Cx KB * Cx CR) 
-	   (Cx CB * Cx CR + Cx KB * Cx MR + Cx KB * Cx CR * Cx Tc + Cx Kp * Cx CR + Cx mR * Cx KB + Cx KB * Cx CR) 
-	   (Cx Kp * Cx MR + Cx mR * Cx CB + Cx mR * Cx KB * Cx Tc + Cx mR * Cx CR + Cx CB * Cx MR + Cx CB * Cx CR * Cx Tc + Cx KB * Cx MR * Cx Tc) 
-	     (Cx mR * Cx MR + Cx mR * Cx CR * Cx Tc + Cx mR * Cx CB * Cx Tc + Cx CB * Cx MR * Cx Tc) (Cx mR * Cx MR * Cx Tc) s`;;
+     tf_admit_eq_iolm fH Vs (m,c,k) Kp KB CB CR MR mR Tc s`;;
 
 
-e (SIMP_TAC [TF_ADMIT_EQ_1D_IOLM]);;
-
-
-let TF_ADMIT_EQ_1D_IOLM_FINAL = top_thm ();;
-
-(*=========================================================================*)
-(*=========================================================================*)
-
-
-(* ------------------------------------------------------------------------- *)
-(* ------------------------------------------------------------------------- *)
-(* ------------------------------------------------------------------------- *)
-
-(*---  The improved closed-loop model verification   ---*)
-
-
-let lst_Vs_fun_iclm_1 = new_definition `  
-    lst_Vs_fun_iclm_1  (b0:complex) b1 b2 b3 b4 b5 b6 =
-              [b0; b1; b2; b3; b4; b5; b6]`;;
-
-
-let lst_fH_fun_iclm_1 = new_definition `  
-    lst_fH_fun_iclm_1 KB CB Kp CH KH =
-                        [Cx (&0);
-	                     Cx Kp * Cx KB * Cx KH; 
-	                         Cx Kp * Cx CB * Cx KH + Cx Kp * Cx CH * Cx KB; 
-	                                        Cx Kp * Cx CB * Cx CH]`;;
-
-
-let admit_eq_1d_iclm_1 = new_definition
-    `admit_eq_1d_iclm_1 (fH:force_fun) (Vs:dist_fun) KB CB Kp CH KH (b0:complex) b1 b2 b3 b4 b5 b6 t = 
-        (diff_eq_n_order 6 (lst_Vs_fun_iclm_1 b0 b1 b2 b3 b4 b5 b6) Vs t =
-                  diff_eq_n_order 3 (lst_fH_fun_iclm_1 KB CB Kp CH KH) fH t)`;; 
-
-
-
-let tf_admit_eq_iclm_1 = new_definition 
-   `tf_admit_eq_iclm_1 (fH:force_fun) (Vs:vel_fun) KB CB Kp CH KH b0 b1 b2 b3 b4 b5 b6 s
-    = ( transfer_function s fH Vs = 
-    (((Cx Kp * Cx CB * Cx CH) * s pow 3 + 
-				    (Cx Kp * Cx CB * Cx KH + Cx Kp * Cx CH * Cx KB) * s pow 2 + 
-		             (Cx Kp * Cx KB * Cx KH) * s ) / 
-	 (b6 * s pow 6 + 
-	    b5 * s pow 5 + 
-		     b4 * s pow 4 + 
-	            b3 * s pow 3 + 
-				   b2 * s pow 2 + 
-		             b1 * s + 
-						b0)) )`;;
-
-
-
-g `!k c m (fH:force_fun) (Vs:vel_fun) (Tc:real) KB CB Kp CH KH b0 b1 b2 b3 b4 b5 b6 s.
-   valid_phycl_intractn_parmtrs_fm ((m,c,k):phy_inter_par) /\
-   (!t. differentiable_higher_derivative 6 Vs t) /\  
-   (!t. differentiable_higher_derivative 3 fH t) /\
-   (laplace_exists_higher_deriv 6 Vs s) /\ 
-   (laplace_exists_higher_deriv 3 fH s) /\
-    zero_initial_conditions 5 Vs /\
-    zero_initial_conditions 2 fH /\
-  ~(laplace_transform fH s = Cx (&0)) /\
-  ~((b6 * s pow 6 + 
-	    b5 * s pow 5 + 
-		     b4 * s pow 4 + 
-	            b3 * s pow 3 + 
-				   b2 * s pow 2 + 
-		             b1 * s + 
-						b0) = Cx (&0)) /\
-   (!t. admit_eq_1d_iclm_1 fH Vs KB CB Kp CH KH b0 b1 b2 b3 b4 b5 b6 t)
-    ==> 
-     tf_admit_eq_iclm_1 fH Vs KB CB Kp CH KH b0 b1 b2 b3 b4 b5 b6 s`;;
-
-
-e (REWRITE_TAC [valid_phycl_intractn_parmtrs_fm; admit_eq_1d_iclm_1; tf_admit_eq_iclm_1; transfer_function]);;
+e (REWRITE_TAC [valid_phycl_intractn_parmtrs_fm; admit_eq_1d_iolm; tf_admit_eq_iolm; transfer_function]);;
 e (REPEAT STRIP_TAC THEN
   ASM_SIMP_TAC
     [COMPLEX_FIELD
        `! a b c d. ~(d = Cx (&0)) /\  ~(b = Cx (&0)) ==> ( (a / b = c / d ) = (a * d = b * c ))`]);;
+
 e (SUBGOAL_THEN
-    `(b6 * s pow 6 + 
-	    (b5:complex) * s pow 5 + 
-		     b4 * s pow 4 + 
-	            b3 * s pow 3 + 
-				   b2 * s pow 2 + 
-		             b1 * s + 
-						b0) = 
-      vsum (0..6) (\i. (EL i (lst_Vs_fun_iclm_1 b0 b1 b2 b3 b4 b5 b6)) * s pow i)`
+    `((Cx m * (Cx mR * Cx MR * Cx Tc)) * s pow 5 + (Cx m * (Cx mR * Cx MR +
+    Cx mR * Cx CR * Cx Tc +
+    Cx mR * Cx CB * Cx Tc +
+    Cx CB * Cx MR * Cx Tc) + Cx c * (Cx mR * Cx MR * Cx Tc)) * s pow 4 + 
+	       (Cx m * (Cx Kp * Cx MR +
+    Cx mR * Cx CB +
+    Cx mR * Cx KB * Cx Tc +
+    Cx mR * Cx CR +
+    Cx CB * Cx MR +
+    Cx CB * Cx CR * Cx Tc +
+    Cx KB * Cx MR * Cx Tc) + Cx c * (Cx mR * Cx MR +
+    Cx mR * Cx CR * Cx Tc +
+    Cx mR * Cx CB * Cx Tc +
+    Cx CB * Cx MR * Cx Tc)) * s pow 3 + (Cx m * (Cx CB * Cx CR +
+    Cx KB * Cx MR +
+    Cx KB * Cx CR * Cx Tc +
+    Cx Kp * Cx CR +
+    Cx mR * Cx KB +
+    Cx KB * Cx CR) + Cx c * (Cx Kp * Cx MR +
+    Cx mR * Cx CB +
+    Cx mR * Cx KB * Cx Tc +
+    Cx mR * Cx CR +
+    Cx CB * Cx MR +
+    Cx CB * Cx CR * Cx Tc +
+    Cx KB * Cx MR * Cx Tc)) * s pow 2 + 
+		                      (Cx m * (Cx Kp * Cx KB + Cx KB * Cx CR) + Cx c * (Cx CB * Cx CR +
+    Cx KB * Cx MR +
+    Cx KB * Cx CR * Cx Tc +
+    Cx Kp * Cx CR +
+    Cx mR * Cx KB +
+    Cx KB * Cx CR)) * s + Cx c * (Cx Kp * Cx KB + Cx KB * Cx CR)) = 
+      vsum (0..5) (\i. (EL i (lst_Vs_fun_iolm (m,c,k) Kp KB CB CR MR mR Tc)) * s pow i)`
     ASSUME_TAC);;
-      e (TF_SUM_SIMP lst_Vs_fun_iclm_1);;
+      e (TF_SUM_SIMP lst_Vs_fun_iolm);;
       e (SIMP_TAC [CX_ADD; CX_SUB; CX_MUL; CX_DIV] THEN TF_POW_SIMP complex_pow THEN CONV_TAC COMPLEX_FIELD);;
 
 e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
 
-e (SUBGOAL_THEN `laplace_transform fH s * ((Cx Kp * Cx CB * Cx CH) * s pow 3 + 
-				    (Cx Kp * Cx CB * Cx KH + Cx Kp * Cx CH * Cx KB) * s pow 2 + 
-		             (Cx Kp * Cx KB * Cx KH) * s ) = laplace_transform fH s * vsum (0..3) (\i. EL i (lst_fH_fun_iclm_1 KB CB Kp CH KH) * s pow i)` ASSUME_TAC);;
+e (SUBGOAL_THEN `laplace_transform fH s * (Cx Kp * Cx CB * s + Cx Kp * Cx KB) = laplace_transform fH s * vsum (0..1) (\i. EL i (lst_fH_fun_iolm_final KB CB Kp) * s pow i)` ASSUME_TAC);;
       e (AP_TERM_TAC);;
-      e (TF_SUM_SIMP lst_fH_fun_iclm_1);;
+      e (TF_SUM_SIMP lst_fH_fun_iolm);;
       e (TF_POW_SIMP complex_pow THEN CONV_TAC COMPLEX_FIELD);;
 
 e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
 e (MATCH_MP_TAC TRANSFER_FUNCTION_OF_N_ORDER_SYS_ALT_SECOND);;
 e (TF_ARITH_TAC THEN ASM_SIMP_TAC [diff_eq_n_order_sys]);;
 
-let TF_ADMIT_EQ_1D_ICLM = top_thm ();;
+let TF_ADMIT_EQ_1D_IOLM = top_thm ();;
 
 
 (* ------------------------------------------------------------------------- *)
@@ -653,9 +574,63 @@ let TF_ADMIT_EQ_1D_ICLM = top_thm ();;
 (*---  The improved closed-loop model verification  ---*)
 
 
+let lst_Vs_fun_iclm = new_definition `  
+    lst_Vs_fun_iclm ((m,c,k):phy_inter_par) Kp KH KB KR CB CR CH MR mR Tc =
+              [(Cx Kp * Cx KH * Cx KB);
+	          (Cx c * Cx Kp * Cx KB + Cx Kp * Cx KH * Cx CB + 
+         Cx Kp * Cx CH * Cx KB + Cx c * Cx KB * Cx CR);
+	    (Cx m * Cx KB * Cx CR + Cx c * Cx Kp * Cx CB + Cx m * Cx Kp * Cx KB + 
+       Cx c * Cx KB * Cx CR * Cx Tc + Cx Kp * Cx CH * Cx CB + Cx c * Cx mR * Cx KB + 
+	   Cx c * Cx CB * Cx CR + Cx c * Cx KB * Cx MR + Cx c * Cx Kp * Cx CR);
+	      (Cx c * Cx CB * Cx CR * Cx Tc + Cx m * Cx mR * Cx KB + Cx m * Cx Kp * Cx  CB + 
+         Cx m * Cx CB * Cx CR + Cx m * Cx KB * Cx MR + Cx c * Cx CB * Cx MR + Cx c * Cx Kp * Cx MR +
+           Cx c * Cx Kp * Cx MR * Cx Tc + Cx c * Cx mR * Cx CB + Cx m * Cx Kp * Cx CR + 
+		      Cx m * Cx KB * Cx CR * Cx Tc + Cx c * Cx mR * Cx KB * Cx Tc + Cx CR * Cx mR * Cx c);
+	        (Cx c * Cx CB * Cx MR * Cx Tc + Cx c * Cx mR * Cx MR + Cx m * Cx Kp * Cx MR + Cx m * Cx mR * Cx CB + Cx m * Cx mR * Cx CR + 
+         Cx m * Cx mR * Cx CR * Cx Tc + Cx m * Cx mR * Cx CB * Cx Tc + Cx m * Cx KB * Cx MR * Cx Tc + 
+		   Cx m * Cx CB * Cx CR * Cx Tc + Cx m * Cx CB * Cx MR + Cx m * Cx mR * Cx KR * Cx Tc);
+		  (Cx m * Cx CB * Cx MR * Cx Tc + Cx m * Cx mR * Cx CR * Cx Tc + Cx m * Cx mR * Cx CB * Cx Tc + Cx m * Cx mR * Cx MR + Cx c * Cx mR * Cx MR * Cx Tc);
+		    (Cx m * Cx mR * Cx MR * Cx Tc)]`;;
 
 
-g `!k c m (fH:force_fun) (Vs:vel_fun) (Tc:real) KB CB Kp CH KH b0 b1 b2 b3 b4 b5 b6 s.
+let lst_fH_fun_iclm = new_definition `  
+    lst_fH_fun_iclm KB CB Kp CH KH =
+                        [Cx (&0);
+	                     Cx Kp * Cx KB * Cx KH; 
+	                         Cx Kp * Cx CB * Cx KH + Cx Kp * Cx CH * Cx KB; 
+	                                        Cx Kp * Cx CB * Cx CH]`;;
+
+let admit_eq_1d_iclm = new_definition
+    `admit_eq_1d_iclm (fH:force_fun) (Vs:dist_fun) ((m,c,k):phy_inter_par) Kp KH KB KR CB CR CH MR mR Tc  t = 
+        (diff_eq_n_order 6 (lst_Vs_fun_iclm (m,c,k) Kp KH KB KR CB CR CH MR mR Tc) Vs t =
+                  diff_eq_n_order 3 (lst_fH_fun_iclm KB CB Kp CH KH) fH t)`;; 
+
+
+
+let tf_admit_eq_iclm = new_definition 
+   `tf_admit_eq_iclm (fH:force_fun) (Vs:vel_fun) ((m,c,k):phy_inter_par) Kp KH KB KR CB CR CH MR mR Tc s
+    = ( transfer_function s fH Vs = 
+    (((Cx Kp * Cx CB * Cx CH) * s pow 3 + 
+				    (Cx Kp * Cx CB * Cx KH + Cx Kp * Cx CH * Cx KB) * s pow 2 + 
+		             (Cx Kp * Cx KB * Cx KH) * s ) / 
+	 ((Cx m * Cx mR * Cx MR * Cx Tc) * s pow 6 + 
+	    (Cx m * Cx CB * Cx MR * Cx Tc + Cx m * Cx mR * Cx CR * Cx Tc + Cx m * Cx mR * Cx CB * Cx Tc + Cx m * Cx mR * Cx MR + Cx c * Cx mR * Cx MR * Cx Tc) * s pow 5 + 
+		     (Cx c * Cx CB * Cx MR * Cx Tc + Cx c * Cx mR * Cx MR + Cx m * Cx Kp * Cx MR + Cx m * Cx mR * Cx CB + Cx m * Cx mR * Cx CR + 
+         Cx m * Cx mR * Cx CR * Cx Tc + Cx m * Cx mR * Cx CB * Cx Tc + Cx m * Cx KB * Cx MR * Cx Tc + 
+		   Cx m * Cx CB * Cx CR * Cx Tc + Cx m * Cx CB * Cx MR + Cx m * Cx mR * Cx KR * Cx Tc) * s pow 4 + 
+	            (Cx c * Cx CB * Cx CR * Cx Tc + Cx m * Cx mR * Cx KB + Cx m * Cx Kp * Cx  CB + 
+         Cx m * Cx CB * Cx CR + Cx m * Cx KB * Cx MR + Cx c * Cx CB * Cx MR + Cx c * Cx Kp * Cx MR +
+           Cx c * Cx Kp * Cx MR * Cx Tc + Cx c * Cx mR * Cx CB + Cx m * Cx Kp * Cx CR + 
+		      Cx m * Cx KB * Cx CR * Cx Tc + Cx c * Cx mR * Cx KB * Cx Tc + Cx CR * Cx mR * Cx c) * s pow 3 + 
+				   (Cx m * Cx KB * Cx CR + Cx c * Cx Kp * Cx CB + Cx m * Cx Kp * Cx KB + 
+       Cx c * Cx KB * Cx CR * Cx Tc + Cx Kp * Cx CH * Cx CB + Cx c * Cx mR * Cx KB + 
+	   Cx c * Cx CB * Cx CR + Cx c * Cx KB * Cx MR + Cx c * Cx Kp * Cx CR) * s pow 2 + 
+		             (Cx c * Cx Kp * Cx KB + Cx Kp * Cx KH * Cx CB + 
+         Cx Kp * Cx CH * Cx KB + Cx c * Cx KB * Cx CR) * s + 
+						(Cx Kp * Cx KH * Cx KB))) )`;;
+
+
+g `!k c m (fH:force_fun) (Vs:vel_fun) Kp KH KB KR CB CR CH MR mR Tc s.
    valid_phycl_intractn_parmtrs_fm ((m,c,k):phy_inter_par) /\
    (!t. differentiable_higher_derivative 6 Vs t) /\  
    (!t. differentiable_higher_derivative 3 fH t) /\
@@ -665,61 +640,101 @@ g `!k c m (fH:force_fun) (Vs:vel_fun) (Tc:real) KB CB Kp CH KH b0 b1 b2 b3 b4 b5
     zero_initial_conditions 2 fH /\
   ~(laplace_transform fH s = Cx (&0)) /\
   ~(((Cx m * Cx mR * Cx MR * Cx Tc) * s pow 6 + 
-	    (Cx m * Cx cB * Cx MR * Cx Tc + Cx m * Cx mR * Cx CR * Cx Tc + Cx m * Cx mR * Cx CB * Cx Tc + 
-		                Cx m * Cx mR * Cx MR + Cx c * Cx mR * Cx MR * Cx Tc) * s pow 5 + 
-		     (Cx c * Cx CB * Cx MR * Cx Tc + Cx c * Cx mR * Cx MR + Cx m * Cx KP * Cx MR + Cx m * Cx mR * Cx CB + Cx m * Cx mR * Cx CR + 
-         Cx m * Cx mR* Cx CR * Cx Tc + Cx m* Cx mR * Cx CB * Cx Tc + Cx m * Cx KB * Cx MR * Cx Tc + 
+	    (Cx m * Cx CB * Cx MR * Cx Tc + Cx m * Cx mR * Cx CR * Cx Tc + Cx m * Cx mR * Cx CB * Cx Tc + Cx m * Cx mR * Cx MR + Cx c * Cx mR * Cx MR * Cx Tc) * s pow 5 + 
+		     (Cx c * Cx CB * Cx MR * Cx Tc + Cx c * Cx mR * Cx MR + Cx m * Cx Kp * Cx MR + Cx m * Cx mR * Cx CB + Cx m * Cx mR * Cx CR + 
+         Cx m * Cx mR * Cx CR * Cx Tc + Cx m * Cx mR * Cx CB * Cx Tc + Cx m * Cx KB * Cx MR * Cx Tc + 
 		   Cx m * Cx CB * Cx CR * Cx Tc + Cx m * Cx CB * Cx MR + Cx m * Cx mR * Cx KR * Cx Tc) * s pow 4 + 
-	            (Cx c * Cx CB * Cx CR * Cx Tc + Cx m * Cx mR * Cx KB + Cx m * Cx KP * Cx  CB + 
-         Cx m * Cx CB * Cx CR + Cx m * Cx KB * Cx MR + Cx c * Cx CB * Cx MR + Cx c * Cx KP * Cx MR +
-           Cx c * Cx KP * Cx MR * Cx Tc + Cx c * Cx mR * Cx CB + Cx m * Cx KP * Cx CR + 
+	            (Cx c * Cx CB * Cx CR * Cx Tc + Cx m * Cx mR * Cx KB + Cx m * Cx Kp * Cx  CB + 
+         Cx m * Cx CB * Cx CR + Cx m * Cx KB * Cx MR + Cx c * Cx CB * Cx MR + Cx c * Cx Kp * Cx MR +
+           Cx c * Cx Kp * Cx MR * Cx Tc + Cx c * Cx mR * Cx CB + Cx m * Cx Kp * Cx CR + 
 		      Cx m * Cx KB * Cx CR * Cx Tc + Cx c * Cx mR * Cx KB * Cx Tc + Cx CR * Cx mR * Cx c) * s pow 3 + 
-				   (Cx m * Cx KB * Cx CR + Cx c * Cx KP * Cx CB + Cx m * Cx KP * Cx KB + 
-       Cx c * Cx KB * Cx CR * Cx Tc + Cx KP * Cx CH * Cx CB + Cx c * Cx mR * Cx KB + 
-	   Cx c * Cx CB * Cx CR + Cx c * Cx KB * Cx MR + Cx c * Cx KP * Cx CR) * s pow 2 + 
-		             (Cx c * Cx KP * Cx KB + Cx KP * Cx KH * Cx CB + 
-         Cx KP * Cx CH * Cx KB + Cx c * Cx KB * Cx CR) * s + 
+				   (Cx m * Cx KB * Cx CR + Cx c * Cx Kp * Cx CB + Cx m * Cx Kp * Cx KB + 
+       Cx c * Cx KB * Cx CR * Cx Tc + Cx Kp * Cx CH * Cx CB + Cx c * Cx mR * Cx KB + 
+	   Cx c * Cx CB * Cx CR + Cx c * Cx KB * Cx MR + Cx c * Cx Kp * Cx CR) * s pow 2 + 
+		             (Cx c * Cx Kp * Cx KB + Cx Kp * Cx KH * Cx CB + 
+         Cx Kp * Cx CH * Cx KB + Cx c * Cx KB * Cx CR) * s + 
 						(Cx Kp * Cx KH * Cx KB)) = Cx (&0)) /\
-   (!t. admit_eq_1d_iclm_1 fH Vs KB CB Kp CH KH 
-         (Cx Kp * Cx KH * Cx KB)   
-             (Cx c * Cx KP * Cx KB + Cx KP * Cx KH * Cx CB + 
-         Cx KP * Cx CH * Cx KB + Cx c * Cx KB * Cx CR)   
-                     (Cx m * Cx KB * Cx CR + Cx c * Cx KP * Cx CB + Cx m * Cx KP * Cx KB + 
-       Cx c * Cx KB * Cx CR * Cx Tc + Cx KP * Cx CH * Cx CB + Cx c * Cx mR * Cx KB + 
-	   Cx c * Cx CB * Cx CR + Cx c * Cx KB * Cx MR + Cx c * Cx KP * Cx CR)   
-       (Cx c * Cx CB * Cx CR * Cx Tc + Cx m * Cx mR * Cx KB + Cx m * Cx KP * Cx  CB + 
-         Cx m * Cx CB * Cx CR + Cx m * Cx KB * Cx MR + Cx c * Cx CB * Cx MR + Cx c * Cx KP * Cx MR +
-           Cx c * Cx KP * Cx MR * Cx Tc + Cx c * Cx mR * Cx CB + Cx m * Cx KP * Cx CR + 
-		      Cx m * Cx KB * Cx CR * Cx Tc + Cx c * Cx mR * Cx KB * Cx Tc + Cx CR * Cx mR * Cx c)   
-         (Cx c * Cx CB * Cx MR * Cx Tc + Cx c * Cx mR * Cx MR + Cx m * Cx KP * Cx MR + Cx m * Cx mR * Cx CB + Cx m * Cx mR * Cx CR + 
-         Cx m * Cx mR* Cx CR * Cx Tc + Cx m* Cx mR * Cx CB * Cx Tc + Cx m * Cx KB * Cx MR * Cx Tc + 
-		   Cx m * Cx CB * Cx CR * Cx Tc + Cx m * Cx CB * Cx MR + Cx m * Cx mR * Cx KR * Cx Tc)   
-               (Cx m * Cx cB * Cx MR * Cx Tc + Cx m * Cx mR * Cx CR * Cx Tc + 
-			          Cx m * Cx mR * Cx CB * Cx Tc + Cx m * Cx mR * Cx MR + Cx c * Cx mR * Cx MR * Cx Tc) 
-                                                  (Cx m * Cx mR * Cx MR * Cx Tc) t)
+   (!t. admit_eq_1d_iclm fH Vs (m,c,k) Kp KH KB KR CB CR CH MR mR Tc t)
     ==> 
-     tf_admit_eq_iclm_1 fH Vs KB CB Kp CH KH 
-             (Cx Kp * Cx KH * Cx KB)	 
-                       (Cx c * Cx KP * Cx KB + Cx KP * Cx KH * Cx CB + 
-         Cx KP * Cx CH * Cx KB + Cx c * Cx KB * Cx CR)	 
-	      (Cx m * Cx KB * Cx CR + Cx c * Cx KP * Cx CB + Cx m * Cx KP * Cx KB + 
-       Cx c * Cx KB * Cx CR * Cx Tc + Cx KP * Cx CH * Cx CB + Cx c * Cx mR * Cx KB + 
-	   Cx c * Cx CB * Cx CR + Cx c * Cx KB * Cx MR + Cx c * Cx KP * Cx CR)
-        (Cx c * Cx CB * Cx CR * Cx Tc + Cx m * Cx mR * Cx KB + Cx m * Cx KP * Cx  CB + 
-         Cx m * Cx CB * Cx CR + Cx m * Cx KB * Cx MR + Cx c * Cx CB * Cx MR + Cx c * Cx KP * Cx MR +
-           Cx c * Cx KP * Cx MR * Cx Tc + Cx c * Cx mR * Cx CB + Cx m * Cx KP * Cx CR + 
-		      Cx m * Cx KB * Cx CR * Cx Tc + Cx c * Cx mR * Cx KB * Cx Tc + Cx CR * Cx mR * Cx c)	 
-	     (Cx c * Cx CB * Cx MR * Cx Tc + Cx c * Cx mR * Cx MR + Cx m * Cx KP * Cx MR + Cx m * Cx mR * Cx CB + Cx m * Cx mR * Cx CR + 
-         Cx m * Cx mR* Cx CR * Cx Tc + Cx m* Cx mR * Cx CB * Cx Tc + Cx m * Cx KB * Cx MR * Cx Tc + 
-		   Cx m * Cx CB * Cx CR * Cx Tc + Cx m * Cx CB * Cx MR + Cx m * Cx mR * Cx KR * Cx Tc) 
-	             (Cx m * Cx cB * Cx MR * Cx Tc + Cx m * Cx mR * Cx CR * Cx Tc + Cx m * Cx mR * Cx CB * Cx Tc + Cx m * Cx mR * Cx MR + Cx c * Cx mR * Cx MR * Cx Tc) 
-													(Cx m * Cx mR * Cx MR * Cx Tc) s`;;
+     tf_admit_eq_iclm fH Vs (m,c,k) Kp KH KB KR CB CR CH MR mR Tc s`;;
 
 
-e (REWRITE_TAC [TF_ADMIT_EQ_1D_ICLM]);;
+e (REWRITE_TAC [valid_phycl_intractn_parmtrs_fm; admit_eq_1d_iclm; tf_admit_eq_iclm; transfer_function]);;
+e (REPEAT STRIP_TAC);;
+e (ASM_SIMP_TAC
+    [COMPLEX_FIELD
+       `! a b c d. ~(d = Cx (&0)) /\  ~(b = Cx (&0)) ==> ( (a / b = c / d ) = (a * d = b * c ))`]);;
 
-let TF_ADMIT_EQ_1D_ICLM_FINAL = top_thm ();;
 
+e (SUBGOAL_THEN
+    `((Cx m * Cx mR * Cx MR * Cx Tc) * s pow 6 +
+          (Cx m * Cx CB * Cx MR * Cx Tc +
+           Cx m * Cx mR * Cx CR * Cx Tc +
+           Cx m * Cx mR * Cx CB * Cx Tc +
+           Cx m * Cx mR * Cx MR +
+           Cx c * Cx mR * Cx MR * Cx Tc) *
+          s pow 5 +
+          (Cx c * Cx CB * Cx MR * Cx Tc +
+           Cx c * Cx mR * Cx MR +
+           Cx m * Cx Kp * Cx MR +
+           Cx m * Cx mR * Cx CB +
+           Cx m * Cx mR * Cx CR +
+           Cx m * Cx mR * Cx CR * Cx Tc +
+           Cx m * Cx mR * Cx CB * Cx Tc +
+           Cx m * Cx KB * Cx MR * Cx Tc +
+           Cx m * Cx CB * Cx CR * Cx Tc +
+           Cx m * Cx CB * Cx MR +
+           Cx m * Cx mR * Cx KR * Cx Tc) *
+          s pow 4 +
+          (Cx c * Cx CB * Cx CR * Cx Tc +
+           Cx m * Cx mR * Cx KB +
+           Cx m * Cx Kp * Cx CB +
+           Cx m * Cx CB * Cx CR +
+           Cx m * Cx KB * Cx MR +
+           Cx c * Cx CB * Cx MR +
+           Cx c * Cx Kp * Cx MR +
+           Cx c * Cx Kp * Cx MR * Cx Tc +
+           Cx c * Cx mR * Cx CB +
+           Cx m * Cx Kp * Cx CR +
+           Cx m * Cx KB * Cx CR * Cx Tc +
+           Cx c * Cx mR * Cx KB * Cx Tc +
+           Cx CR * Cx mR * Cx c) *
+          s pow 3 +
+          (Cx m * Cx KB * Cx CR +
+           Cx c * Cx Kp * Cx CB +
+           Cx m * Cx Kp * Cx KB +
+           Cx c * Cx KB * Cx CR * Cx Tc +
+           Cx Kp * Cx CH * Cx CB +
+           Cx c * Cx mR * Cx KB +
+           Cx c * Cx CB * Cx CR +
+           Cx c * Cx KB * Cx MR +
+           Cx c * Cx Kp * Cx CR) *
+          s pow 2 +
+          (Cx c * Cx Kp * Cx KB +
+           Cx Kp * Cx KH * Cx CB +
+           Cx Kp * Cx CH * Cx KB +
+           Cx c * Cx KB * Cx CR) *
+          s +
+          Cx Kp * Cx KH * Cx KB) = 
+      vsum (0..6) (\i. (EL i (lst_Vs_fun_iclm (m,c,k) Kp KH KB KR CB CR CH MR mR Tc)) * s pow i)`
+    ASSUME_TAC);;
+      e (TF_SUM_SIMP lst_Vs_fun_iclm);;
+      e (CONV_TAC COMPLEX_FIELD);;
+
+e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+
+e (SUBGOAL_THEN `laplace_transform fH s * ((Cx Kp * Cx CB * Cx CH) * s pow 3 + 
+				    (Cx Kp * Cx CB * Cx KH + Cx Kp * Cx CH * Cx KB) * s pow 2 + 
+		             (Cx Kp * Cx KB * Cx KH) * s ) = laplace_transform fH s * vsum (0..3) (\i. EL i (lst_fH_fun_iclm KB CB Kp CH KH) * s pow i)` ASSUME_TAC);;
+      e (AP_TERM_TAC);;
+      e (TF_SUM_SIMP lst_fH_fun_iclm);;
+      e (TF_POW_SIMP complex_pow THEN CONV_TAC COMPLEX_FIELD);;
+
+e (ONCE_ASM_REWRITE_TAC [] THEN POP_ASSUM (K ALL_TAC));;
+e (MATCH_MP_TAC TRANSFER_FUNCTION_OF_N_ORDER_SYS_ALT_SECOND);;
+e (TF_ARITH_TAC THEN ASM_SIMP_TAC [diff_eq_n_order_sys]);;
+
+let TF_ADMIT_EQ_1D_ICLM = top_thm ();;
 
 (* ------------------------------------------------------------------------- *)
 (* ------------------------------------------------------------------------- *)
@@ -733,7 +748,6 @@ let is_stable_phycl_intractn = new_definition
     `is_stable_phycl_intractn (p:complex -> complex)  = 
           ~ ({x | p x = Cx(&0) /\ Re x < (&0)} = EMPTY)`;; 
 
-
 let REAL_INV_NZ = prove
  (`!x. ~(x = &0) ==> ~(inv x = &0)`,
   GEN_TAC THEN DISCH_TAC THEN DISCH_THEN (MP_TAC o AP_TERM `(*) (x:real)`) THEN
@@ -741,6 +755,7 @@ let REAL_INV_NZ = prove
   SUBGOAL_THEN `(x * inv x)=(&1)` ASSUME_TAC THENL
    [MATCH_MP_TAC REAL_MUL_RINV THEN ASM_SIMP_TAC [];
     PURE_ASM_SIMP_TAC [] THEN CONV_TAC REAL_FIELD]);;
+
 
 let REAL_INV_POS = prove(
   `!x. &0 < x ==> &0 < inv x`,
@@ -1930,7 +1945,7 @@ g `!a b c.  ~(Cx (&0) = Cx a) /\
           &0 < b pow 2 - &4 * a * c /\
           (&0 < a /\ (sqrt (b pow 2 - &4 * a * c) < b \/
             -- b < sqrt (b pow 2 - &4 * a * c)))) 
-         ==> is_stable_phycl_intractn (\x. Cx a * x pow 2 + Cx b * x + Cx c)`;;
+         ==> is_stable_phycl_intractn (\s. Cx a * s pow 2 + Cx b * s + Cx c)`;;
 
 e (REPEAT GEN_TAC THEN DISCH_TAC);;
 e (MATCH_MP_TAC QUAD_STABLE_ALL_CASES_GEN_PHRI);;
@@ -1961,7 +1976,7 @@ g `!Tc m k c.
          ==> is_stable_phycl_intractn (\s. Cx ((m / c) * Tc) * s pow 2 + Cx ((m / c) + Tc) * s + Cx (&1))`;;
 	 
 e (REWRITE_TAC [valid_phycl_intractn_parmtrs_fm]);;
-e (SIMP_TAC [STABILITY_CONSRAINTS_GEN_PHRI]);;
+e (SIMP_TAC [STABILITY_CONSRAINTS_GEN_PHRI; CX_INJ]);;
 
 let STABLE_OLM_PHRI = top_thm ();;
 
@@ -1993,7 +2008,7 @@ e (ASM_SIMP_TAC []);;
 e (POP_ASSUM MP_TAC);;
 e (REWRITE_TAC [CX_INJ] THEN CONV_TAC REAL_FIELD);;
 
-let STABLE_OLM_PHRI = top_thm ();;
+let STABLE_OLM_PHRI_ALT = top_thm ();;
 
 (*===========================================================================*)
 
@@ -2009,7 +2024,7 @@ g `!Tc m k c.
          ==> is_stable_phycl_intractn (\s. Cx ((m / c) * Tc) * s pow 2 + Cx ((m / c) + Tc) * s + Cx (&1))`;;
 
 e (REPEAT GEN_TAC THEN DISCH_TAC);;
-e (MATCH_MP_TAC STABLE_OLM_PHRI);;
+e (MATCH_MP_TAC STABLE_OLM_PHRI_ALT);;
 e (EXISTS_TAC `k:real`);;
 e (ASM_SIMP_TAC [REAL_FIELD `&4 * a * &1  = &4 * a`]);;
 
@@ -5420,17 +5435,6 @@ g `!a0 a1 a2 a21 a22 a3 a31 a32 a4 a41 a42 (s:complex).
   
 ) ==> is_stable_phycl_intractn (\s. Cx a4 * s pow 4 + Cx a3 * s pow 3 + Cx a2 * s pow 2 + Cx a1 * s + Cx a0) `;;
 
-
-
-
-(*
-
-a = a4;    b = a3;     c = a2;    d = a1;     e = a0   
-
-a1 = a41;   a2 = a42;   b1 = a31;    b2 = a32;  c1 = a21;   c2 = a22
-
-*)
-
 e (MESON_TAC [QUARTIC_STABLE]);;
 
 let QUARTIC_STABLE_IOLM = top_thm ();;
@@ -7662,11 +7666,61 @@ e (CONV_TAC REAL_FIELD);;
 
 let STABLE_IOLM = top_thm();;
 
+(*===========================================================================*)
+(*===========================================================================*)
 
 
+g `!m c mR MR CR CB KB Kp Tc a41 a42 a31 a32 a21 a22.
+         ~(Cx (&0) = Cx m) /\
+         ~(Cx (&0) = Cx a) /\
+         ~(Cx (&0) = Cx a41) /\
+         ~(Cx (&0) = Cx a42) /\
+         Cx (mR * MR * Tc) = Cx (a41 * a42) /\
+         Cx (mR * MR + mR * CR * Tc + mR * CB * Tc + CB * MR * Tc) = Cx (a41 * a32) + Cx (a42 * a31) /\
+         Cx (Kp * MR + mR * CB + mR * KB * Tc + mR * CR + CB * MR + CB * CR * Tc + KB * MR * Tc) = Cx (a41 * a22) + Cx (a31 * a32) + Cx (a42 * a21) /\
+         Cx (CB * CR + KB * MR + KB * CR * Tc + Kp * CR + mR * KB + KB * CR) = Cx (a31 * a22) + Cx (a32 * a21) /\
+         Cx (Kp * KB + KB * CR) = Cx (a21 * a22) /\
+(
+(
+((&0 < a31 / a41 /\
+          (a31 pow 2 - &4 * a41 * a21 < &0 \/ a31 pow 2 - &4 * a41 * a21 = &0) \/
+          &0 < a31 pow 2 - &4 * a41 * a21 /\
+          (a41 < &0 /\
+           (a31 < sqrt (a31 pow 2 - &4 * a41 * a21) \/
+            sqrt (a31 pow 2 - &4 * a41 * a21) < --a31) \/
+           &0 < a41 /\
+           (sqrt (a31 pow 2 - &4 * a41 * a21) < a31 \/
+            --a31 < sqrt (a31 pow 2 - &4 * a41 * a21))))
+ 
+)  
+) \/
 
+((&0 < a32 / a42 /\
+          (a32 pow 2 - &4 * a42 * a22 < &0 \/ a32 pow 2 - &4 * a42 * a22 = &0) \/
+          &0 < a32 pow 2 - &4 * a42 * a22 /\
+          (a42 < &0 /\
+           (a32 < sqrt (a32 pow 2 - &4 * a42 * a22) \/
+            sqrt (a32 pow 2 - &4 * a42 * a22) < --a32) \/
+           &0 < a42 /\
+           (sqrt (a32 pow 2 - &4 * a42 * a22) < a32 \/
+            --a32 < sqrt (a32 pow 2 - &4 * a42 * a22))))
+  )
+  
+) ==> is_stable_phycl_intractn (\s. (Cx m * s + Cx c) * (Cx (mR * MR * Tc) * s pow 4 + Cx (mR * MR + mR * CR * Tc + mR * CB * Tc + CB * MR * Tc) * s pow 3 + Cx (Kp * MR + mR * CB + mR * KB * Tc + mR * CR + CB * MR + CB * CR * Tc + KB * MR * Tc) * s pow 2 + Cx (CB * CR + KB * MR + KB * CR * Tc + Kp * CR + mR * KB + KB * CR) * s + Cx (Kp * KB + KB * CR))) `;;
+
+e (REPEAT GEN_TAC THEN DISCH_TAC);;
+e (MATCH_MP_TAC STABLE_IOLM);;
+e (EXISTS_TAC `a41:real`);;
+e (EXISTS_TAC `a42:real`);;
+e (EXISTS_TAC `a31:real`);;
+e (EXISTS_TAC `a32:real`);;
+e (EXISTS_TAC `a21:real`);;
+e (EXISTS_TAC `a22:real`);;
+
+e (ASM_SIMP_TAC []);;
+
+let STABLE_IOLM_ALT = top_thm();;
 
 (*===========================================================================*)
 (*                          End of the Verification                          *)
 (*===========================================================================*)
-
