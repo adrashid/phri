@@ -33,15 +33,6 @@ delete_user_printer "print_typed_var";;
 (*            Formalization of Physical Human Robot Interaction              *)
 (*===========================================================================*)
 
-(*
-We need to load real analysis theory of HOL Light by 
-needs "Multivariate/realanalysis.ml"
-
-and the Laplace transform theory available at Github
-
-*)
-
-
 (*---------------------------------------------------------------------------*)
 (*---------------------------------------------------------------------------*)
 (*                Physical Interaction Parameters                            *)
@@ -247,6 +238,38 @@ let LAPLACE_OF_RHS_ADMIT_EQ_GEN = top_thm ();;
 
 (* ------------------------------------------------------------------------- *)
 
+let TF_SUM_SIMP x = 
+ REWRITE_TAC [x; VSUM_0_LIST_ELEMENT_RMUL_POW;
+                VSUM_1_LIST_ELEMENT_RMUL_POW; VSUM_2_LIST_ELEMENT_RMUL_POW; 
+                VSUM_3_LIST_ELEMENT_RMUL_POW; VSUM_4_LIST_ELEMENT_RMUL_POW;
+		VSUM_5_LIST_ELEMENT_RMUL_POW; VSUM_6_LIST_ELEMENT_RMUL_POW;
+		VSUM_7_LIST_ELEMENT_RMUL_POW; VSUM_8_LIST_ELEMENT_RMUL_POW;
+                VSUM_9_LIST_ELEMENT_RMUL_POW; VSUM_10_LIST_ELEMENT_RMUL_POW;
+	     VSUM_11_LIST_ELEMENT_RMUL_POW; VSUM_12_LIST_ELEMENT_RMUL_POW;
+	     VSUM_13_LIST_ELEMENT_RMUL_POW; VSUM_14_LIST_ELEMENT_RMUL_POW;
+	     VSUM_15_LIST_ELEMENT_RMUL_POW; VSUM_16_LIST_ELEMENT_RMUL_POW;
+	     VSUM_17_LIST_ELEMENT_RMUL_POW; VSUM_18_LIST_ELEMENT_RMUL_POW;
+	     VSUM_19_LIST_ELEMENT_RMUL_POW; VSUM_20_LIST_ELEMENT_RMUL_POW];;
+
+let TF_POW_SIMP x = 
+ REWRITE_TAC [x; COMPLEX_POW_1; COMPLEX_POW_2; COMPLEX_POW_3; COMPLEX_POW_4;
+	     COMPLEX_POW_5; COMPLEX_POW_6; COMPLEX_POW_7; COMPLEX_POW_8;
+	     COMPLEX_POW_9; COMPLEX_POW_10; COMPLEX_POW_11; COMPLEX_POW_12;
+	  COMPLEX_POW_13; COMPLEX_POW_14; COMPLEX_POW_15; COMPLEX_POW_16;
+	  COMPLEX_POW_17; COMPLEX_POW_18; COMPLEX_POW_19; COMPLEX_POW_20];;
+
+let TF_ARITH_TAC = 
+ ASM_REWRITE_TAC 
+   [ARITH_RULE `0 - 1 = 0`;
+    ARITH_RULE `1 - 1 = 0`; ARITH_RULE `2 - 1 = 1`; ARITH_RULE `3 - 1 = 2`;
+    ARITH_RULE `4 - 1 = 3`; ARITH_RULE `5 - 1 = 4`; ARITH_RULE `6 - 1 = 5`;
+    ARITH_RULE `7 - 1 = 6`; ARITH_RULE `8 - 1 = 7`; ARITH_RULE `9 - 1 = 8`;
+    ARITH_RULE `10 - 1 = 9`; ARITH_RULE `11 - 1 = 10`; ARITH_RULE `12 - 1 = 11`;
+    ARITH_RULE `13 - 1 = 12`; ARITH_RULE `14 - 1 = 13`; ARITH_RULE `15 - 1 = 14`;
+    ARITH_RULE `16 - 1 = 15`; ARITH_RULE `17 - 1 = 16`; ARITH_RULE `18 - 1 = 17`;
+    ARITH_RULE `19 - 1 = 18`; ARITH_RULE `20 - 1 = 19`; ARITH_RULE `21 - 1 = 20`];;
+
+(* ------------------------------------------------------------------------- *)
 
 (**-----transfer function = Xd / FH = 1 / s (ms + c)-----**)
 
