@@ -1,8 +1,8 @@
 
 (* ========================================================================= *)
 (*                                                                           *)
-(*     Formal Verification of Physical Human-Robot
-                Interaction using Interactive Theorem Proving                *)
+(*     Formal Verification of Physical Human-Robot                           *)
+(*              Interaction using Interactive Theorem Proving                *)
 (*                                                                           *)
 (*    (c) Copyright, Sa'ed Abed*, Adnan Rashid** and Osman Hasan**           *)
 (*       *Computer Engineering Department,                                   *)
